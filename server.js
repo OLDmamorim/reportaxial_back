@@ -122,10 +122,13 @@ app.get('/api/admin/users', authenticateToken, checkUserType('admin'), async (re
 });
 
 app.post('/api/store/problems', authenticateToken, checkUserType('store'), async (req, res) => {
-  const { title, description, priority } = req.body;
+  const { problemType, orderDate, supplierOrder, product, eurocode, observations } = req.body;
   try {
     const store = await pool.query('SELECT id FROM stores WHERE user_id = $1', [req.user.userId]);
-    const result = await pool.query('INSERT INTO problems (store_id, title, description, priority) VALUES ($1, $2, $3, $4) RETURNING *', [store.rows[0].id, title, description, priority || 'normal']);
+    const result = await pool.query(
+      'INSERT INTO problems (store_id, problem_type, order_date, supplier_order, product, eurocode, observations) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [store.rows[0].id, problemType, orderDate, supplierOrder, product, eurocode || null, observations]
+    );
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error(error);
