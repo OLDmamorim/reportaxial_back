@@ -14,9 +14,9 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Configurar CORS para aceitar pedidos do Netlify
+// Configurar CORS para aceitar pedidos APENAS do Netlify
 app.use(cors({
-  origin: ['https://reportaxial.netlify.app', 'http://localhost:5173'],
+  origin: ['https://reportaxial.netlify.app'],
   credentials: true
 }));
 
