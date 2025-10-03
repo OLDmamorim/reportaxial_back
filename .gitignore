@@ -1,0 +1,6 @@
+﻿node_modules/
+package-lock.json
+.env
+.env.local
+*.log
+.DS_Store
