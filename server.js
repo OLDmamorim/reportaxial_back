@@ -14,8 +14,18 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-app.use(cors());
+// Configurar CORS para aceitar pedidos do Netlify
+app.use(cors({
+  origin: ['https://reportaxial.netlify.app', 'http://localhost:5173'],
+  credentials: true
+}));
+
 app.use(express.json());
+
+// Rota de teste
+app.get('/', (req, res) => {
+  res.json({ message: 'API ReportAxial funcionando!' });
+});
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
