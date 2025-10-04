@@ -171,6 +171,20 @@ app.post('/api/supplier/problems/:problemId/responses', authenticateToken, check
   }
 });
 
+app.patch('/api/supplier/problems/:problemId/resolve', authenticateToken, checkUserType('supplier'), async (req, res) => {
+  const { problemId } = req.params;
+  try {
+    const result = await pool.query('UPDATE problems SET status = \'resolved\' WHERE id = $1 RETURNING *', [problemId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Problema não encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Erro ao marcar como resolvido' });
+  }
+});
+
 app.get('/api/supplier/problems/:problemId', authenticateToken, checkUserType('supplier'), async (req, res) => {
   const { problemId } = req.params;
   try {
