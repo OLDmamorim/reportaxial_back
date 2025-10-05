@@ -179,7 +179,7 @@ app.post('/api/problems', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'Acesso negado' });
     }
 
-    const { problem_description, order_date, supplier_order, product, eurocode, observations } = req.body;
+    const { problem_description, order_date, supplier_order, product, eurocode, observations, priority } = req.body;
 
     // Buscar store_id do utilizador
     const storeResult = await pool.query('SELECT id FROM stores WHERE user_id = $1', [req.userId]);
@@ -189,16 +189,23 @@ app.post('/api/problems', authMiddleware, async (req, res) => {
 
     const storeId = storeResult.rows[0].id;
 
+    // Construir descrição completa com todos os detalhes
+    let fullDescription = problem_description || '';
+    if (order_date) fullDescription += `\nData: ${order_date}`;
+    if (supplier_order) fullDescription += `\nEnc Fornecedor: ${supplier_order}`;
+    if (eurocode) fullDescription += `\nEurocódigo: ${eurocode}`;
+    if (observations) fullDescription += `\nObservações: ${observations}`;
+
     const result = await pool.query(
-      `INSERT INTO problems (store_id, problem_description, order_date, supplier_order, product, eurocode, observations, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending') RETURNING *`,
-      [storeId, problem_description, order_date, supplier_order, product, eurocode, observations]
+      `INSERT INTO problems (store_id, title, description, priority, status)
+       VALUES ($1, $2, $3, $4, 'pending') RETURNING *`,
+      [storeId, problem_description, fullDescription.trim(), priority || 'normal']
     );
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao criar problema:', error);
-    res.status(500).json({ message: 'Erro no servidor' });
+    res.status(500).json({ message: 'Erro no servidor', error: error.message });
   }
 });
 
@@ -217,7 +224,15 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
     const storeId = storeResult.rows[0].id;
 
     const result = await pool.query(
-      `SELECT p.*, r.response_text, r.created_at as response_date
+      `SELECT p.id, 
+              p.title as problem_description,
+              p.description,
+              p.priority,
+              p.status,
+              p.created_at,
+              p.updated_at,
+              r.response_text, 
+              r.created_at as response_date
        FROM problems p
        LEFT JOIN responses r ON p.id = r.problem_id
        WHERE p.store_id = $1
@@ -240,7 +255,13 @@ app.get('/api/problems/supplier', authMiddleware, async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT p.*, 
+      `SELECT p.id,
+              p.title as problem_description,
+              p.description,
+              p.priority,
+              p.status,
+              p.created_at,
+              p.updated_at,
               s.store_name, 
               s.contact_person as store_contact,
               s.phone as store_phone,
@@ -355,7 +376,13 @@ app.get('/api/problems/:problemId', authMiddleware, async (req, res) => {
     const { problemId } = req.params;
 
     const result = await pool.query(
-      `SELECT p.*, 
+      `SELECT p.id,
+              p.title as problem_description,
+              p.description,
+              p.priority,
+              p.status,
+              p.created_at,
+              p.updated_at,
               s.store_name, 
               s.contact_person as store_contact,
               s.phone as store_phone,
