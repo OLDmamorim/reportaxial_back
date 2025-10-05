@@ -230,20 +230,31 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
               p.priority,
               p.status,
               p.created_at,
-              p.updated_at,
-              r.response_text, 
-              r.created_at as response_date
+              p.updated_at
        FROM problems p
-       LEFT JOIN responses r ON p.id = r.problem_id
        WHERE p.store_id = $1
        ORDER BY p.created_at DESC`,
       [storeId]
     );
 
-    res.json(result.rows);
+    // Buscar respostas separadamente
+    const problemsWithResponses = await Promise.all(result.rows.map(async (problem) => {
+      const responseResult = await pool.query(
+        'SELECT response_text, created_at as response_date FROM responses WHERE problem_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [problem.id]
+      );
+      
+      return {
+        ...problem,
+        response_text: responseResult.rows[0]?.response_text || null,
+        response_date: responseResult.rows[0]?.response_date || null
+      };
+    }));
+
+    res.json(problemsWithResponses);
   } catch (error) {
     console.error('Erro ao listar problemas:', error);
-    res.status(500).json({ message: 'Erro no servidor' });
+    res.status(500).json({ message: 'Erro no servidor', error: error.message });
   }
 });
 
