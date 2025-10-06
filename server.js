@@ -43,7 +43,9 @@ app.get('/api/migrate', async (req, res) => {
       ADD COLUMN IF NOT EXISTS title VARCHAR(255),
       ADD COLUMN IF NOT EXISTS description TEXT,
       ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'normal',
-      ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending';
+      ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending',
+      ADD COLUMN IF NOT EXISTS viewed_by_supplier BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS viewed_by_store BOOLEAN DEFAULT FALSE;
     `);
     
     console.log('Migração concluída com sucesso!');
@@ -444,6 +446,52 @@ app.patch('/api/problems/:id', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao editar problema:', error);
+    res.status(500).json({ message: 'Erro no servidor', error: error.message });
+  }
+});
+
+// Endpoint para marcar problema como visto
+app.patch('/api/problems/:id/mark-viewed', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userType } = req.body; // 'supplier' ou 'store'
+
+    console.log('[Backend] Marcando problema como visto:', { id, userType, userId: req.userId });
+
+    // Buscar problema atual
+    const problemCheck = await pool.query('SELECT * FROM problems WHERE id = $1', [id]);
+    if (problemCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Problema não encontrado' });
+    }
+
+    const problem = problemCheck.rows[0];
+
+    // Determinar qual campo atualizar
+    const field = userType === 'supplier' ? 'viewed_by_supplier' : 'viewed_by_store';
+
+    // Se fornecedor está abrindo um problema pendente, mudar para "Em Progresso"
+    let newStatus = problem.status;
+    if (userType === 'supplier' && problem.status === 'pending') {
+      newStatus = 'in_progress';
+      console.log('[Backend] Mudando status de pending para in_progress');
+    }
+
+    // Atualizar campo de visualização e status
+    const result = await pool.query(
+      `UPDATE problems 
+       SET ${field} = TRUE, status = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2 
+       RETURNING *`,
+      [newStatus, id]
+    );
+
+    console.log('[Backend] Problema marcado como visto:', result.rows[0]);
+    res.json({
+      message: 'Problema marcado como visto',
+      problem: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Erro ao marcar problema como visto:', error);
     res.status(500).json({ message: 'Erro no servidor', error: error.message });
   }
 });
