@@ -22,11 +22,13 @@ app.get('/api/migrate', async (req, res) => {
   try {
     console.log('Iniciando migração da base de dados...');
     
-    // Adicionar colunas title e description se não existirem
+    // Adicionar colunas que faltam
     await pool.query(`
       ALTER TABLE problems 
       ADD COLUMN IF NOT EXISTS title VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS description TEXT;
+      ADD COLUMN IF NOT EXISTS description TEXT,
+      ADD COLUMN IF NOT EXISTS priority VARCHAR(50) DEFAULT 'normal',
+      ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending';
     `);
     
     console.log('Migração concluída com sucesso!');
