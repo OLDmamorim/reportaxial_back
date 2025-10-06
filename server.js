@@ -702,6 +702,42 @@ app.delete('/api/clear-database', async (req, res) => {
   }
 });
 
+// Endpoint de migração: adicionar coluna resolved_at
+app.post('/api/admin/migrate-resolved-at', async (req, res) => {
+  try {
+    // Verificar se a coluna já existe
+    const checkColumn = await pool.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'problems' AND column_name = 'resolved_at'
+    `);
+
+    if (checkColumn.rows.length > 0) {
+      return res.json({ 
+        message: 'Coluna resolved_at já existe',
+        status: 'already_exists'
+      });
+    }
+
+    // Adicionar coluna resolved_at
+    await pool.query(`
+      ALTER TABLE problems 
+      ADD COLUMN resolved_at TIMESTAMP
+    `);
+
+    res.json({ 
+      message: 'Coluna resolved_at criada com sucesso!',
+      status: 'created'
+    });
+  } catch (error) {
+    console.error('Erro ao criar coluna resolved_at:', error);
+    res.status(500).json({ 
+      message: 'Erro ao criar coluna', 
+      error: error.message 
+    });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
