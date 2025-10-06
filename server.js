@@ -17,6 +17,23 @@ const pool = new Pool({
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu-secret-super-seguro-aqui';
 
+// Rota raiz
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'ReportAxial API está funcionando!',
+    version: '1.0.0',
+    endpoints: [
+      'GET /api/migrate',
+      'POST /api/auth/login',
+      'POST /api/auth/register',
+      'GET /api/problems/store',
+      'GET /api/problems/supplier',
+      'POST /api/problems/:problemId/messages',
+      'GET /api/problems/:problemId/messages'
+    ]
+  });
+});
+
 // Ver estrutura da tabela problems
 app.get('/api/table-structure', async (req, res) => {
   try {
