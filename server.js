@@ -318,10 +318,11 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
               COALESCE(p.priority, 'normal') as priority,
               COALESCE(p.status, 'pending') as status,
               p.created_at,
-              p.updated_at
+              p.updated_at,
+              p.viewed_by_store
        FROM problems p
        WHERE p.store_id = $1
-       ORDER BY p.created_at DESC`,
+       ORDER BY p.updated_at DESC`,
       [storeId]
     );
 
@@ -368,6 +369,7 @@ app.get('/api/problems/supplier', authMiddleware, async (req, res) => {
               COALESCE(p.status, 'pending') as status,
               p.created_at,
               p.updated_at,
+              p.viewed_by_supplier,
               s.store_name, 
               s.contact_person as store_contact,
               s.phone as store_phone,
@@ -376,7 +378,7 @@ app.get('/api/problems/supplier', authMiddleware, async (req, res) => {
        FROM problems p
        JOIN stores s ON p.store_id = s.id
        LEFT JOIN responses r ON p.id = r.problem_id
-       ORDER BY p.created_at DESC`
+       ORDER BY p.updated_at DESC`
     );
 
     console.log(`[API] Fornecedor: Encontrados ${result.rows.length} problemas`);
@@ -613,15 +615,15 @@ app.post('/api/problems/:problemId/messages', authMiddleware, async (req, res) =
       [problemId, req.userType, message]
     );
 
-    // Marcar como não visto pelo outro lado
+    // Marcar como não visto pelo outro lado e atualizar updated_at
     if (req.userType === 'store') {
       await pool.query(
-        'UPDATE problems SET viewed_by_supplier = FALSE WHERE id = $1',
+        'UPDATE problems SET viewed_by_supplier = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
         [problemId]
       );
     } else if (req.userType === 'supplier') {
       await pool.query(
-        'UPDATE problems SET viewed_by_store = FALSE WHERE id = $1',
+        'UPDATE problems SET viewed_by_store = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
         [problemId]
       );
     }
