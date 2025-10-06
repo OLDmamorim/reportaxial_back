@@ -268,10 +268,11 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
               p.problem_type as problem_description,
               p.order_date,
               p.supplier_order,
+              p.product,
               p.eurocode,
               p.observations,
-              p.priority,
-              p.status,
+              COALESCE(p.priority, 'normal') as priority,
+              COALESCE(p.status, 'pending') as status,
               p.created_at,
               p.updated_at
        FROM problems p
@@ -279,6 +280,8 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
        ORDER BY p.created_at DESC`,
       [storeId]
     );
+
+    console.log(`[API] Encontrados ${result.rows.length} problemas para store_id ${storeId}`);
 
     // Buscar respostas separadamente
     const problemsWithResponses = await Promise.all(result.rows.map(async (problem) => {
@@ -294,6 +297,7 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
       };
     }));
 
+    console.log(`[API] Retornando ${problemsWithResponses.length} problemas com respostas`);
     res.json(problemsWithResponses);
   } catch (error) {
     console.error('Erro ao listar problemas:', error);
@@ -310,10 +314,14 @@ app.get('/api/problems/supplier', authMiddleware, async (req, res) => {
 
     const result = await pool.query(
       `SELECT p.id,
-              p.title as problem_description,
-              p.description,
-              p.priority,
-              p.status,
+              p.problem_type as problem_description,
+              p.order_date,
+              p.supplier_order,
+              p.product,
+              p.eurocode,
+              p.observations,
+              COALESCE(p.priority, 'normal') as priority,
+              COALESCE(p.status, 'pending') as status,
               p.created_at,
               p.updated_at,
               s.store_name, 
@@ -327,6 +335,7 @@ app.get('/api/problems/supplier', authMiddleware, async (req, res) => {
        ORDER BY p.created_at DESC`
     );
 
+    console.log(`[API] Fornecedor: Encontrados ${result.rows.length} problemas`);
     res.json(result.rows);
   } catch (error) {
     console.error('Erro ao listar problemas:', error);
@@ -431,10 +440,14 @@ app.get('/api/problems/:problemId', authMiddleware, async (req, res) => {
 
     const result = await pool.query(
       `SELECT p.id,
-              p.title as problem_description,
-              p.description,
-              p.priority,
-              p.status,
+              p.problem_type as problem_description,
+              p.order_date,
+              p.supplier_order,
+              p.product,
+              p.eurocode,
+              p.observations,
+              COALESCE(p.priority, 'normal') as priority,
+              COALESCE(p.status, 'pending') as status,
               p.created_at,
               p.updated_at,
               s.store_name, 
