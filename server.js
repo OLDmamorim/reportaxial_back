@@ -659,6 +659,28 @@ app.get('/api/problems/:problemId/messages', authMiddleware, async (req, res) =>
 
 // ============ SERVIDOR ============
 
+// Endpoint para limpar base de dados (APENAS PARA TESTES)
+app.delete('/api/clear-database', async (req, res) => {
+  try {
+    // Limpar mensagens primeiro (devido à foreign key)
+    await pool.query('DELETE FROM problem_messages');
+    
+    // Limpar respostas antigas
+    await pool.query('DELETE FROM responses');
+    
+    // Limpar problemas
+    await pool.query('DELETE FROM problems');
+    
+    res.json({ 
+      message: 'Base de dados limpa com sucesso!',
+      cleared: ['problem_messages', 'responses', 'problems']
+    });
+  } catch (error) {
+    console.error('Erro ao limpar base de dados:', error);
+    res.status(500).json({ message: 'Erro ao limpar base de dados', error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
