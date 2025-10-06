@@ -653,4 +653,4 @@ pool.query('SELECT NOW()', (err, res) => {
   } else {
     console.log('✅ Conexão com Neon PostgreSQL estabelecida:', res.rows[0].now);
   }
-});
+});// Redeploy Mon Oct  6 08:11:29 EDT 2025
