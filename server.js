@@ -330,17 +330,23 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
 
     console.log(`[API] Encontrados ${result.rows.length} problemas para store_id ${storeId}`);
 
-    // Buscar respostas separadamente
+    // Buscar respostas e mensagens separadamente
     const problemsWithResponses = await Promise.all(result.rows.map(async (problem) => {
       const responseResult = await pool.query(
         'SELECT response_text, created_at as response_date FROM responses WHERE problem_id = $1 ORDER BY created_at DESC LIMIT 1',
         [problem.id]
       );
       
+      const messagesResult = await pool.query(
+        'SELECT message, user_type, created_at FROM problem_messages WHERE problem_id = $1 ORDER BY created_at ASC',
+        [problem.id]
+      );
+      
       return {
         ...problem,
         response_text: responseResult.rows[0]?.response_text || null,
-        response_date: responseResult.rows[0]?.response_date || null
+        response_date: responseResult.rows[0]?.response_date || null,
+        messages: messagesResult.rows || []
       };
     }));
 
@@ -383,8 +389,21 @@ app.get('/api/problems/supplier', authMiddleware, async (req, res) => {
        ORDER BY p.updated_at DESC`
     );
 
-    console.log(`[API] Fornecedor: Encontrados ${result.rows.length} problemas`);
-    res.json(result.rows);
+    // Buscar mensagens para cada problema
+    const problemsWithMessages = await Promise.all(result.rows.map(async (problem) => {
+      const messagesResult = await pool.query(
+        'SELECT message, user_type, created_at FROM problem_messages WHERE problem_id = $1 ORDER BY created_at ASC',
+        [problem.id]
+      );
+      
+      return {
+        ...problem,
+        messages: messagesResult.rows || []
+      };
+    }));
+
+    console.log(`[API] Fornecedor: Encontrados ${problemsWithMessages.length} problemas`);
+    res.json(problemsWithMessages);
   } catch (error) {
     console.error('Erro ao listar problemas:', error);
     res.status(500).json({ message: 'Erro no servidor' });
