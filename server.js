@@ -226,17 +226,20 @@ app.post('/api/problems', authMiddleware, async (req, res) => {
 
     const storeId = storeResult.rows[0].id;
 
-    // Construir descrição completa com todos os detalhes
-    let fullDescription = problem_description || '';
-    if (order_date) fullDescription += `\nData: ${order_date}`;
-    if (supplier_order) fullDescription += `\nEnc Fornecedor: ${supplier_order}`;
-    if (eurocode) fullDescription += `\nEurocódigo: ${eurocode}`;
-    if (observations) fullDescription += `\nObservações: ${observations}`;
-
     const result = await pool.query(
-      `INSERT INTO problems (store_id, title, description, priority, status)
-       VALUES ($1, $2, $3, $4, 'pending') RETURNING *`,
-      [storeId, problem_description, fullDescription.trim(), priority || 'normal']
+      `INSERT INTO problems (store_id, problem_type, order_date, supplier_order, product, eurocode, observations, status, priority)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [
+        storeId, 
+        problem_description || 'Problema', 
+        order_date || new Date().toISOString().split('T')[0], 
+        supplier_order || '', 
+        product || '', 
+        eurocode || '', 
+        observations || '', 
+        'pending',
+        priority || 'normal'
+      ]
     );
 
     res.status(201).json(result.rows[0]);
@@ -262,8 +265,11 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
 
     const result = await pool.query(
       `SELECT p.id, 
-              p.title as problem_description,
-              p.description,
+              p.problem_type as problem_description,
+              p.order_date,
+              p.supplier_order,
+              p.eurocode,
+              p.observations,
               p.priority,
               p.status,
               p.created_at,
