@@ -17,6 +17,21 @@ const pool = new Pool({
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu-secret-super-seguro-aqui';
 
+// Ver estrutura da tabela problems
+app.get('/api/table-structure', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_name = 'problems'
+      ORDER BY ordinal_position;
+    `);
+    res.json({ columns: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Rota de migração da base de dados (executar uma vez)
 app.get('/api/migrate', async (req, res) => {
   try {
