@@ -321,6 +321,7 @@ app.get('/api/problems/store', authMiddleware, async (req, res) => {
               COALESCE(p.status, 'pending') as status,
               p.created_at,
               p.updated_at,
+              p.resolved_at,
               p.viewed_by_store
        FROM problems p
        WHERE p.store_id = $1
@@ -377,6 +378,7 @@ app.get('/api/problems/supplier', authMiddleware, async (req, res) => {
               COALESCE(p.status, 'pending') as status,
               p.created_at,
               p.updated_at,
+              p.resolved_at,
               p.viewed_by_supplier,
               s.store_name, 
               s.contact_person as store_contact,
@@ -557,10 +559,10 @@ app.patch('/api/problems/:problemId/resolve', authMiddleware, async (req, res) =
       return res.status(404).json({ message: 'Problema não encontrado' });
     }
 
-    // Atualizar status para "resolved"
+    // Atualizar status para "resolved" e definir data de resolução
     const result = await pool.query(
       `UPDATE problems 
-       SET status = 'resolved', updated_at = CURRENT_TIMESTAMP 
+       SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
        WHERE id = $1 
        RETURNING *`,
       [problemId]
