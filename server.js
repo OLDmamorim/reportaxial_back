@@ -271,8 +271,8 @@ app.post('/api/problems', authMiddleware, async (req, res) => {
     const storeId = storeResult.rows[0].id;
 
     const result = await pool.query(
-      `INSERT INTO problems (store_id, problem_type, order_date, supplier_order, product, eurocode, observations, status, priority)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      `INSERT INTO problems (store_id, problem_type, order_date, supplier_order, product, eurocode, observations, status, priority, viewed_by_store, viewed_by_supplier)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
       [
         storeId, 
         problem_description || 'Problema', 
@@ -282,7 +282,9 @@ app.post('/api/problems', authMiddleware, async (req, res) => {
         eurocode || '', 
         observations || '', 
         'pending',
-        priority || 'normal'
+        priority || 'normal',
+        true,  // viewed_by_store = true (loja acabou de criar)
+        false  // viewed_by_supplier = false (fornecedor ainda não viu)
       ]
     );
 
