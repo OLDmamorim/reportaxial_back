@@ -218,6 +218,20 @@ app.post('/api/problems', authMiddleware, async (req, res) => {
 
     const { problem_description, order_date, supplier_order, product, eurocode, observations, priority } = req.body;
 
+    // Validar data
+    if (order_date) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(order_date)) {
+        return res.status(400).json({ message: 'Formato de data inválido. Use YYYY-MM-DD' });
+      }
+      
+      // Validar se a data é válida
+      const date = new Date(order_date);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({ message: 'Data inválida' });
+      }
+    }
+
     // Buscar store_id do utilizador
     const storeResult = await pool.query('SELECT id FROM stores WHERE user_id = $1', [req.userId]);
     if (storeResult.rows.length === 0) {
