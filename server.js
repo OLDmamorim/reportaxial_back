@@ -17,6 +17,26 @@ const pool = new Pool({
 
 const JWT_SECRET = process.env.JWT_SECRET || 'seu-secret-super-seguro-aqui';
 
+// Rota de migração da base de dados (executar uma vez)
+app.get('/api/migrate', async (req, res) => {
+  try {
+    console.log('Iniciando migração da base de dados...');
+    
+    // Adicionar colunas title e description se não existirem
+    await pool.query(`
+      ALTER TABLE problems 
+      ADD COLUMN IF NOT EXISTS title VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS description TEXT;
+    `);
+    
+    console.log('Migração concluída com sucesso!');
+    res.json({ message: 'Migração concluída com sucesso!', success: true });
+  } catch (error) {
+    console.error('Erro na migração:', error);
+    res.status(500).json({ message: 'Erro na migração', error: error.message });
+  }
+});
+
 // Middleware de Autenticação
 const authMiddleware = async (req, res, next) => {
   try {
