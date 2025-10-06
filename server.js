@@ -414,12 +414,42 @@ app.post('/api/problems/:problemId/respond', authMiddleware, async (req, res) =>
 });
 
 // 🆕 MARCAR PROBLEMA COMO RESOLVIDO (Apenas Fornecedor)
-app.patch('/api/problems/:problemId/resolve', authMiddleware, async (req, res) => {
+// Endpoint para editar observações de um problema
+app.patch('/api/problems/:id', authMiddleware, async (req, res) => {
   try {
-    if (req.userType !== 'supplier') {
-      return res.status(403).json({ message: 'Apenas fornecedores podem marcar como resolvido' });
+    const { id } = req.params;
+    const { observations } = req.body;
+
+    console.log('[Backend] Editando problema:', { id, observations, userId: req.userId });
+
+    // Verificar se o problema existe
+    const problemCheck = await pool.query('SELECT * FROM problems WHERE id = $1', [id]);
+    if (problemCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Problema não encontrado' });
     }
 
+    // Atualizar observações
+    const result = await pool.query(
+      `UPDATE problems 
+       SET observations = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2 
+       RETURNING *`,
+      [observations, id]
+    );
+
+    console.log('[Backend] Problema atualizado:', result.rows[0]);
+    res.json({
+      message: 'Observações atualizadas com sucesso',
+      problem: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Erro ao editar problema:', error);
+    res.status(500).json({ message: 'Erro no servidor', error: error.message });
+  }
+});
+
+app.patch('/api/problems/:problemId/resolve', authMiddleware, async (req, res) => {
+  try {
     const { problemId } = req.params;
 
     // Verificar se o problema existe
