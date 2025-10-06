@@ -48,6 +48,17 @@ app.get('/api/migrate', async (req, res) => {
       ADD COLUMN IF NOT EXISTS viewed_by_store BOOLEAN DEFAULT FALSE;
     `);
     
+    // Criar tabela problem_messages para histórico de conversação
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS problem_messages (
+        id SERIAL PRIMARY KEY,
+        problem_id INTEGER NOT NULL REFERENCES problems(id) ON DELETE CASCADE,
+        user_type VARCHAR(50) NOT NULL,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
     console.log('Migração concluída com sucesso!');
     res.json({ message: 'Migração concluída com sucesso!', success: true });
   } catch (error) {
@@ -561,6 +572,68 @@ app.get('/api/problems/:problemId', authMiddleware, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Erro ao buscar problema:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
+// ============ MENSAGENS (HISTÓRICO DE CONVERSAÇÃO) ============
+
+// Adicionar mensagem ao histórico
+app.post('/api/problems/:problemId/messages', authMiddleware, async (req, res) => {
+  try {
+    const { problemId } = req.params;
+    const { message } = req.body;
+    
+    if (!message || message.trim() === '') {
+      return res.status(400).json({ message: 'Mensagem não pode estar vazia' });
+    }
+
+    // Inserir mensagem
+    const result = await pool.query(
+      `INSERT INTO problem_messages (problem_id, user_type, message) 
+       VALUES ($1, $2, $3) 
+       RETURNING *`,
+      [problemId, req.userType, message]
+    );
+
+    // Marcar como não visto pelo outro lado
+    if (req.userType === 'store') {
+      await pool.query(
+        'UPDATE problems SET viewed_by_supplier = FALSE WHERE id = $1',
+        [problemId]
+      );
+    } else if (req.userType === 'supplier') {
+      await pool.query(
+        'UPDATE problems SET viewed_by_store = FALSE WHERE id = $1',
+        [problemId]
+      );
+    }
+
+    res.json({
+      message: 'Mensagem adicionada com sucesso',
+      data: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Erro ao adicionar mensagem:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
+// Listar mensagens de um problema
+app.get('/api/problems/:problemId/messages', authMiddleware, async (req, res) => {
+  try {
+    const { problemId } = req.params;
+
+    const result = await pool.query(
+      `SELECT * FROM problem_messages 
+       WHERE problem_id = $1 
+       ORDER BY created_at ASC`,
+      [problemId]
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erro ao buscar mensagens:', error);
     res.status(500).json({ message: 'Erro no servidor' });
   }
 });
