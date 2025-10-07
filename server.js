@@ -237,18 +237,124 @@ app.post('/api/admin/create-supplier', authMiddleware, async (req, res) => {
   }
 });
 
-// Resetar password de utilizador
-app.post('/api/admin/reset-password', authMiddleware, async (req, res) => {
+// Criar Loja
+app.post('/api/admin/create-store', authMiddleware, async (req, res) => {
   try {
     if (req.userType !== 'admin') {
       return res.status(403).json({ message: 'Acesso negado' });
     }
 
-    const { userId, newPassword } = req.body;
+    const { username, password, storeName, contactPerson, phone, address } = req.body;
 
-    if (!userId || !newPassword) {
-      return res.status(400).json({ message: 'userId e newPassword são obrigatórios' });
+    // Verificar se username já existe
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [username]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ message: 'Username já existe' });
     }
+
+    // Hash da password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Criar utilizador
+    const userResult = await pool.query(
+      'INSERT INTO users (email, password_hash, user_type) VALUES ($1, $2, $3) RETURNING id',
+      [username, passwordHash, 'store']
+    );
+
+    const userId = userResult.rows[0].id;
+
+    // Criar loja
+    await pool.query(
+      'INSERT INTO stores (user_id, store_name, contact_person, phone, address) VALUES ($1, $2, $3, $4, $5)',
+      [userId, storeName, contactPerson, phone, address]
+    );
+
+    res.status(201).json({ message: 'Loja criada com sucesso' });
+  } catch (error) {
+    console.error('Erro ao criar loja:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
+// Criar Admin
+app.post('/api/admin/create-admin', authMiddleware, async (req, res) => {
+  try {
+    if (req.userType !== 'admin') {
+      return res.status(403).json({ message: 'Acesso negado' });
+    }
+
+    const { username, password } = req.body;
+
+    // Verificar se username já existe
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [username]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ message: 'Username já existe' });
+    }
+
+    // Hash da password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Criar utilizador admin
+    await pool.query(
+      'INSERT INTO users (email, password_hash, user_type) VALUES ($1, $2, $3)',
+      [username, passwordHash, 'admin']
+    );
+
+    res.status(201).json({ message: 'Admin criado com sucesso' });
+  } catch (error) {
+    console.error('Erro ao criar admin:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
+// Criar Utilizador Fornecedor (simplificado)
+app.post('/api/admin/create-supplier-user', authMiddleware, async (req, res) => {
+  try {
+    if (req.userType !== 'admin') {
+      return res.status(403).json({ message: 'Acesso negado' });
+    }
+
+    const { username, password } = req.body;
+
+    // Verificar se username já existe
+    const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [username]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ message: 'Username já existe' });
+    }
+
+    // Hash da password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Criar utilizador fornecedor
+    const userResult = await pool.query(
+      'INSERT INTO users (email, password_hash, user_type) VALUES ($1, $2, $3) RETURNING id',
+      [username, passwordHash, 'supplier']
+    );
+
+    const userId = userResult.rows[0].id;
+
+    // Criar entrada na tabela suppliers (nome genérico)
+    await pool.query(
+      'INSERT INTO suppliers (user_id, supplier_name, contact_person) VALUES ($1, $2, $3)',
+      [userId, 'Fornecedor', username]
+    );
+
+    res.status(201).json({ message: 'Utilizador fornecedor criado com sucesso' });
+  } catch (error) {
+    console.error('Erro ao criar utilizador fornecedor:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
+// Reset de Password
+app.patch('/api/admin/reset-password/:userId', authMiddleware, async (req, res) => {
+  try {
+    if (req.userType !== 'admin') {
+      return res.status(403).json({ message: 'Acesso negado' });
+    }
+
+    const { userId } = req.params;
+    const { newPassword } = req.body;
 
     // Hash da nova password
     const passwordHash = await bcrypt.hash(newPassword, 10);
