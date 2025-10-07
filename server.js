@@ -237,6 +237,35 @@ app.post('/api/admin/create-supplier', authMiddleware, async (req, res) => {
   }
 });
 
+// Resetar password de utilizador
+app.post('/api/admin/reset-password', authMiddleware, async (req, res) => {
+  try {
+    if (req.userType !== 'admin') {
+      return res.status(403).json({ message: 'Acesso negado' });
+    }
+
+    const { userId, newPassword } = req.body;
+
+    if (!userId || !newPassword) {
+      return res.status(400).json({ message: 'userId e newPassword são obrigatórios' });
+    }
+
+    // Hash da nova password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // Atualizar password
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [passwordHash, userId]
+    );
+
+    res.json({ message: 'Password resetada com sucesso' });
+  } catch (error) {
+    console.error('Erro ao resetar password:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
 // ============ PROBLEMAS/REPORTS ============
 
 // Criar problema (Loja)
