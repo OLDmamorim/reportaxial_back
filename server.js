@@ -546,6 +546,68 @@ app.delete('/api/admin/reset-database/:userId', authMiddleware, async (req, res)
   }
 });
 
+// Eliminar utilizador
+app.delete('/api/admin/delete-user/:userId', authMiddleware, async (req, res) => {
+  try {
+    if (req.userType !== 'admin') {
+      return res.status(403).json({ message: 'Acesso negado' });
+    }
+
+    const { userId } = req.params;
+
+    // Verificar tipo de utilizador
+    const userResult = await pool.query('SELECT user_type FROM users WHERE id = $1', [userId]);
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Utilizador não encontrado' });
+    }
+
+    const userType = userResult.rows[0].user_type;
+
+    // Não permitir eliminar admins
+    if (userType === 'admin') {
+      return res.status(403).json({ message: 'Não é possível eliminar utilizadores admin' });
+    }
+
+    if (userType === 'store') {
+      // Obter o store_id
+      const storeResult = await pool.query('SELECT id FROM stores WHERE user_id = $1', [userId]);
+      
+      if (storeResult.rows.length > 0) {
+        const storeId = storeResult.rows[0].id;
+        
+        // Apagar todos os problemas da loja (cascata apagará as mensagens relacionadas)
+        await pool.query('DELETE FROM problems WHERE store_id = $1', [storeId]);
+        
+        // Apagar a loja
+        await pool.query('DELETE FROM stores WHERE id = $1', [storeId]);
+      }
+    } else if (userType === 'supplier') {
+      // Obter o supplier_id
+      const supplierResult = await pool.query('SELECT id FROM suppliers WHERE user_id = $1', [userId]);
+      
+      if (supplierResult.rows.length > 0) {
+        const supplierId = supplierResult.rows[0].id;
+        
+        // Apagar todas as mensagens do fornecedor
+        await pool.query('DELETE FROM problem_messages WHERE user_id = $1', [userId]);
+        
+        // Apagar o fornecedor
+        await pool.query('DELETE FROM suppliers WHERE id = $1', [supplierId]);
+      }
+    }
+
+    // Apagar o utilizador
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+
+    res.json({ message: 'Utilizador eliminado com sucesso' });
+
+  } catch (error) {
+    console.error('Erro ao eliminar utilizador:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
 // ============ PROBLEMAS/REPORTS ============
 
 // Criar problema (Loja)
