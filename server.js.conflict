@@ -3,8 +3,6 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
-const multer = require('multer');
-const xlsx = require('xlsx');
 require('dotenv').config();
 
 const app = express();
@@ -239,13 +237,26 @@ app.post('/api/admin/create-supplier', authMiddleware, async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
+// Resetar password de utilizador
+app.post('/api/admin/reset-password', authMiddleware, async (req, res) => {
+=======
 // Criar Loja
 app.post('/api/admin/create-store', authMiddleware, async (req, res) => {
+>>>>>>> 92cdec39c650decaf60b868f2373f6e15c9cf1b4
   try {
     if (req.userType !== 'admin') {
       return res.status(403).json({ message: 'Acesso negado' });
     }
 
+<<<<<<< HEAD
+    const { userId, newPassword } = req.body;
+
+    if (!userId || !newPassword) {
+      return res.status(400).json({ message: 'userId e newPassword são obrigatórios' });
+    }
+
+=======
     const { username, password, storeName, contactPerson, phone, address } = req.body;
 
     // Verificar se username já existe
@@ -275,105 +286,6 @@ app.post('/api/admin/create-store', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Erro ao criar loja:', error);
     res.status(500).json({ message: 'Erro no servidor' });
-  }
-});
-
-// Configurar multer para upload de ficheiros
-const upload = multer({ 
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB max
-});
-
-// Importar lojas via Excel
-app.post('/api/admin/import-stores', authMiddleware, upload.single('file'), async (req, res) => {
-  try {
-    if (req.userType !== 'admin') {
-      return res.status(403).json({ message: 'Acesso negado' });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ message: 'Nenhum ficheiro enviado' });
-    }
-
-    // Ler ficheiro Excel
-    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(worksheet, { header: ['username', 'password', 'storeName'], range: 1 });
-
-    const results = {
-      success: [],
-      errors: []
-    };
-
-    // Processar cada linha
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      const rowNumber = i + 2; // +2 porque começamos na linha 2 (linha 1 é header)
-
-      try {
-        // Validar dados
-        if (!row.username || !row.password || !row.storeName) {
-          results.errors.push({
-            row: rowNumber,
-            username: row.username || 'N/A',
-            error: 'Dados incompletos (username, password ou storeName em falta)'
-          });
-          continue;
-        }
-
-        // Verificar se username já existe
-        const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [row.username]);
-        if (existingUser.rows.length > 0) {
-          results.errors.push({
-            row: rowNumber,
-            username: row.username,
-            error: 'Username já existe'
-          });
-          continue;
-        }
-
-        // Hash da password
-        const passwordHash = await bcrypt.hash(row.password.toString(), 10);
-
-        // Criar utilizador
-        const userResult = await pool.query(
-          'INSERT INTO users (email, password_hash, user_type) VALUES ($1, $2, $3) RETURNING id',
-          [row.username, passwordHash, 'store']
-        );
-
-        const userId = userResult.rows[0].id;
-
-        // Criar loja
-        await pool.query(
-          'INSERT INTO stores (user_id, store_name) VALUES ($1, $2)',
-          [userId, row.storeName]
-        );
-
-        results.success.push({
-          row: rowNumber,
-          username: row.username,
-          storeName: row.storeName
-        });
-
-      } catch (error) {
-        results.errors.push({
-          row: rowNumber,
-          username: row.username || 'N/A',
-          error: error.message
-        });
-      }
-    }
-
-    res.json({
-      message: `Importação concluída. ${results.success.length} loja(s) criada(s), ${results.errors.length} erro(s).`,
-      success: results.success,
-      errors: results.errors
-    });
-
-  } catch (error) {
-    console.error('Erro ao importar lojas:', error);
-    res.status(500).json({ message: 'Erro ao processar ficheiro Excel' });
   }
 });
 
@@ -457,6 +369,7 @@ app.patch('/api/admin/reset-password/:userId', authMiddleware, async (req, res) 
     const { userId } = req.params;
     const { newPassword } = req.body;
 
+>>>>>>> 92cdec39c650decaf60b868f2373f6e15c9cf1b4
     // Hash da nova password
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
@@ -469,70 +382,6 @@ app.patch('/api/admin/reset-password/:userId', authMiddleware, async (req, res) 
     res.json({ message: 'Password resetada com sucesso' });
   } catch (error) {
     console.error('Erro ao resetar password:', error);
-    res.status(500).json({ message: 'Erro no servidor' });
-  }
-});
-
-// Resetar Base de Dados de Utilizador (apagar todos os problemas)
-app.delete('/api/admin/reset-database/:userId', authMiddleware, async (req, res) => {
-  try {
-    if (req.userType !== 'admin') {
-      return res.status(403).json({ message: 'Acesso negado' });
-    }
-
-    const { userId } = req.params;
-
-    // Verificar tipo de utilizador
-    const userResult = await pool.query('SELECT user_type FROM users WHERE id = $1', [userId]);
-    
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Utilizador não encontrado' });
-    }
-
-    const userType = userResult.rows[0].user_type;
-
-    if (userType === 'store') {
-      // Apagar todos os problemas criados por esta loja
-      const deleteResult = await pool.query(
-        'DELETE FROM problems WHERE store_id = $1',
-        [userId]
-      );
-      res.json({ 
-        message: `Base de dados resetada com sucesso. ${deleteResult.rowCount} problema(s) apagado(s).`,
-        deletedCount: deleteResult.rowCount
-      });
-    } else if (userType === 'supplier') {
-      // Apagar todas as mensagens/respostas do fornecedor
-      const deleteMessagesResult = await pool.query(
-        'DELETE FROM problem_messages WHERE user_id = $1',
-        [userId]
-      );
-      
-      // Resetar observações e status dos problemas onde o fornecedor interveio
-      const resetProblemsResult = await pool.query(
-        `UPDATE problems 
-         SET observations = NULL, 
-             status = 'pending',
-             viewed_by_supplier = false
-         WHERE id IN (
-           SELECT DISTINCT problem_id 
-           FROM problem_messages 
-           WHERE user_id = $1
-         )`,
-        [userId]
-      );
-      
-      res.json({ 
-        message: `Base de dados resetada com sucesso. ${deleteMessagesResult.rowCount} mensagem(ns) apagada(s).`,
-        deletedMessages: deleteMessagesResult.rowCount,
-        resetProblems: resetProblemsResult.rowCount
-      });
-    } else {
-      return res.status(400).json({ message: 'Tipo de utilizador não suportado para reset de base de dados' });
-    }
-
-  } catch (error) {
-    console.error('Erro ao resetar base de dados:', error);
     res.status(500).json({ message: 'Erro no servidor' });
   }
 });
