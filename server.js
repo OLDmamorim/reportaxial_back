@@ -492,10 +492,19 @@ app.delete('/api/admin/reset-database/:userId', authMiddleware, async (req, res)
     const userType = userResult.rows[0].user_type;
 
     if (userType === 'store') {
+      // Obter o store_id a partir do user_id
+      const storeResult = await pool.query('SELECT id FROM stores WHERE user_id = $1', [userId]);
+      
+      if (storeResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Loja não encontrada' });
+      }
+      
+      const storeId = storeResult.rows[0].id;
+      
       // Apagar todos os problemas criados por esta loja
       const deleteResult = await pool.query(
         'DELETE FROM problems WHERE store_id = $1',
-        [userId]
+        [storeId]
       );
       res.json({ 
         message: `Base de dados resetada com sucesso. ${deleteResult.rowCount} problema(s) apagado(s).`,
