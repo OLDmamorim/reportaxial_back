@@ -372,6 +372,70 @@ app.patch('/api/admin/reset-password/:userId', authMiddleware, async (req, res) 
   }
 });
 
+// Resetar Base de Dados de Utilizador (apagar todos os problemas)
+app.delete('/api/admin/reset-database/:userId', authMiddleware, async (req, res) => {
+  try {
+    if (req.userType !== 'admin') {
+      return res.status(403).json({ message: 'Acesso negado' });
+    }
+
+    const { userId } = req.params;
+
+    // Verificar tipo de utilizador
+    const userResult = await pool.query('SELECT user_type FROM users WHERE id = $1', [userId]);
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Utilizador não encontrado' });
+    }
+
+    const userType = userResult.rows[0].user_type;
+
+    if (userType === 'store') {
+      // Apagar todos os problemas criados por esta loja
+      const deleteResult = await pool.query(
+        'DELETE FROM problems WHERE store_id = $1',
+        [userId]
+      );
+      res.json({ 
+        message: `Base de dados resetada com sucesso. ${deleteResult.rowCount} problema(s) apagado(s).`,
+        deletedCount: deleteResult.rowCount
+      });
+    } else if (userType === 'supplier') {
+      // Apagar todas as mensagens/respostas do fornecedor
+      const deleteMessagesResult = await pool.query(
+        'DELETE FROM problem_messages WHERE user_id = $1',
+        [userId]
+      );
+      
+      // Resetar observações e status dos problemas onde o fornecedor interveio
+      const resetProblemsResult = await pool.query(
+        `UPDATE problems 
+         SET observations = NULL, 
+             status = 'pending',
+             viewed_by_supplier = false
+         WHERE id IN (
+           SELECT DISTINCT problem_id 
+           FROM problem_messages 
+           WHERE user_id = $1
+         )`,
+        [userId]
+      );
+      
+      res.json({ 
+        message: `Base de dados resetada com sucesso. ${deleteMessagesResult.rowCount} mensagem(ns) apagada(s).`,
+        deletedMessages: deleteMessagesResult.rowCount,
+        resetProblems: resetProblemsResult.rowCount
+      });
+    } else {
+      return res.status(400).json({ message: 'Tipo de utilizador não suportado para reset de base de dados' });
+    }
+
+  } catch (error) {
+    console.error('Erro ao resetar base de dados:', error);
+    res.status(500).json({ message: 'Erro no servidor' });
+  }
+});
+
 // ============ PROBLEMAS/REPORTS ============
 
 // Criar problema (Loja)
